@@ -1,94 +1,187 @@
-using Photon.Pun;
+﻿using Photon.Pun;
 using Photon.Realtime;
 using UnityEngine;
+using System.Collections.Generic;
 
 public class DrawingTurnManager : MonoBehaviourPunCallbacks
 {
     public int currentPlayerIndex = 0;
-    //private Player[] players;
+
+    [SerializeField] WordManager wordManager;
+    [SerializeField] GameUIManager gameUIManager;
+    [SerializeField] GameObject drawPrefab; // Your drawing prefab (must have PhotonView)
+
     public Player drawer;
     public Player guesser;
-    [SerializeField]
-    WordManager wordManager;
-    [SerializeField]
-    GameUIManager gameUIManager;[SerializeField]
-    NetworkDrawManager networkDrawManager;
+
+    public bool gameStarted;
+
+    // Dictionary to store spawned draw prefabs per player
+    public Dictionary<int, DrawOnTextureOnline> playerDrawers = new Dictionary<int, DrawOnTextureOnline>();
     void Start()
     {
-        if (!PhotonNetwork.InRoom) return;
-        //players = PhotonNetwork.PlayerList;
+        if (PhotonNetwork.IsMasterClient)
+        {
+            // Spawn self prefab for the first player
+            SpawnDrawPrefab(PhotonNetwork.LocalPlayer.ActorNumber);
+        }
+    }
+    // -------------------------------
+    // Player joins: MasterClient spawns prefab for everyone
+    // -------------------------------
+    public override void OnPlayerEnteredRoom(Player newPlayer)
+    {
+        if (PhotonNetwork.IsMasterClient)
+        {
+            // Spawn prefab for the new player
+            photonView.RPC(nameof(RPC_SpawnDrawPrefab), newPlayer, newPlayer.ActorNumber);
+
+            if (PhotonNetwork.CurrentRoom.PlayerCount == 2)
+                Invoke(nameof(ShowStartButton), 1.5f);
+
+            PhotonNetwork.CurrentRoom.IsVisible = !gameStarted;
+            PhotonNetwork.CurrentRoom.IsOpen = !gameStarted;
+        }
+    }
+    public override void OnPlayerLeftRoom(Player otherPlayer)
+    {
+        gameUIManager.lobbyInfoText.text = $"{otherPlayer.NickName} left the room.";
+
+        gameUIManager.startButton.gameObject.SetActive(PhotonNetwork.IsMasterClient && PhotonNetwork.CurrentRoom.PlayerCount == 2);
+
+        PhotonNetwork.CurrentRoom.IsVisible = !gameStarted;
+        PhotonNetwork.CurrentRoom.IsOpen = !gameStarted;
+
+    }
+    void ShowStartButton()
+    {
+        GameUIManager.instance.startButton.gameObject.SetActive(true);
+    }
+    public void AddAllListForAll()
+    {
+        var drawers = FindObjectsByType<DrawOnTextureOnline>(FindObjectsSortMode.None);
+      
+        for (int i = 0; i < drawers.Length; i++)
+        {
+            playerDrawers[drawers[i].ActorNumber] = drawers[i];
+        }      
+            photonView.RPC(nameof(RPC_RegisterPrefab), RpcTarget.All);
     }
 
-    void BroadcastTurn()
+
+    // -------------------------------
+    // Spawn draw prefab (MasterClient only)
+    // -------------------------------
+
+    [PunRPC]
+    void RPC_SpawnDrawPrefab(int actorNumber)
     {
-        //players = PhotonNetwork.PlayerList;
-        photonView.RPC("RPC_SetCurrentTurn", RpcTarget.All, PhotonNetwork.PlayerList[currentPlayerIndex].ActorNumber);
+        GameObject go = PhotonNetwork.Instantiate(drawPrefab.name, Vector3.zero, Quaternion.identity);
+     
+        DrawOnTextureOnline drawerComp = go.GetComponent<DrawOnTextureOnline>();
+        drawerComp.canDraw = false;
+
+        playerDrawers[actorNumber] = drawerComp;
+        // Add to dictionary for everyone (buffered via RPC)
+        photonView.RPC(nameof(RPC_RegisterPrefab), RpcTarget.All);
     }
 
-    public void EndTurn()
+
+    void SpawnDrawPrefab(int actorNumber)
     {
-        currentPlayerIndex = (currentPlayerIndex + 1) % PhotonNetwork.PlayerList.Length;
+        // Use PhotonNetwork.Instantiate to sync across all clients
+        GameObject go = PhotonNetwork.Instantiate(drawPrefab.name, Vector3.zero, Quaternion.identity);
+        DrawOnTextureOnline drawerComp = go.GetComponent<DrawOnTextureOnline>();
+
+        // Initially disable drawing
+        drawerComp.canDraw = false;
+    }
+
+    // -------------------------------
+    // RPC: register prefab locally on all clients
+    // -------------------------------
+    [PunRPC]
+    void RPC_RegisterPrefab()
+    {
+        var drawers = FindObjectsByType<DrawOnTextureOnline>(FindObjectsSortMode.None);
+        for (int i = 0; i < drawers.Length; i++)
+        {
+            playerDrawers[drawers[i].ActorNumber] = drawers[i];
+        }
+    }
+
+    // -------------------------------
+    // Start first turn
+    // -------------------------------
+    public void AssignRoles()
+    {
+        Player[] players = PhotonNetwork.PlayerList;
+        currentPlayerIndex = Random.Range(0, players.Length);
         BroadcastTurn();
     }
 
+    // -------------------------------
+    // Broadcast turn to all clients
+    // -------------------------------
+    void BroadcastTurn()
+    {
+        gameStarted = true;
+        PhotonNetwork.CurrentRoom.IsVisible = !gameStarted;
+        PhotonNetwork.CurrentRoom.IsOpen = !gameStarted;
+
+        int actorNumber = PhotonNetwork.PlayerList[currentPlayerIndex].ActorNumber;
+        photonView.RPC(nameof(RPC_SetCurrentTurn), RpcTarget.All, actorNumber);
+    }
+
+    // -------------------------------
+    // RPC: Set current turn for everyone
+    // -------------------------------
     [PunRPC]
     void RPC_SetCurrentTurn(int actorNumber)
     {
-        foreach (Player player in PhotonNetwork.PlayerList) { 
-        
-            if(player.ActorNumber == actorNumber)
-            {
-                drawer = player;
-            }
+        foreach (Player p in PhotonNetwork.PlayerList)
+        {
+            if (p.ActorNumber == actorNumber)
+                drawer = p;
             else
-            {
-                guesser = player;
-            }
+                guesser = p;
         }
-       
-        // Set role texts
+
+        // UI updates
         if (PhotonNetwork.LocalPlayer.ActorNumber == actorNumber)
         {
             gameUIManager.SetRoleText("You are DRAWER");
             string word = wordManager.GetRandomWord();
-            gameUIManager.SetWord(word); // Show word only to drawer
+            photonView.RPC(nameof(RPC_SetWord), RpcTarget.All, word);
         }
         else
         {
             gameUIManager.SetRoleText("You are GUESSER");
         }
-        networkDrawManager.canDraw = PhotonNetwork.LocalPlayer.ActorNumber == actorNumber;
 
+        // Enable drawer prefab only for current drawer
+        foreach (var kvp in playerDrawers)
+        {
+            if (kvp.Key == actorNumber)
+                kvp.Value.ClearForAll();
+            kvp.Value.canDraw = (kvp.Key == actorNumber);
+        }
+        gameUIManager.miniWinPanel.SetActive(false);
         gameUIManager.StartTurn();
     }
 
-    
-
-    public void AssignRoles()
+    [PunRPC]
+    void RPC_SetWord(string word)
     {
-        Player[] players = PhotonNetwork.PlayerList;
-      
-        currentPlayerIndex = Random.Range(0, players.Length);
-        BroadcastTurn();
-        // Enable drawing for drawer
-        //NetworkDrawManager.canDraw = (PhotonNetwork.LocalPlayer == drawer);
+        gameUIManager.SetWord(word);
     }
 
-    public int totalRounds = 3;
-    private int currentRound = 0;
-
-
-    /*public void NextRound()
+    // -------------------------------
+    // Move to next turn
+    // -------------------------------
+    public void EndTurn()
     {
-        currentRound++;
-        if (currentRound >= totalRounds)
-        {
-            gameUIManager.EndGame(); // show final winner
-        }
-        else
-        {
-            AssignRoles();
-            gameUIManager.StartTurn();
-        }
-    }*/
+        currentPlayerIndex = (currentPlayerIndex + 1) % PhotonNetwork.PlayerList.Length;
+        BroadcastTurn();
+    }
 }

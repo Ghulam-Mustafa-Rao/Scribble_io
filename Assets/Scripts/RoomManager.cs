@@ -1,11 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 using Photon.Pun;
 using Photon.Realtime;
 using TMPro;
-using System.Text.RegularExpressions;
-
 public class RoomManager : MonoBehaviourPunCallbacks
 {
     [Header("UI References")]
@@ -22,11 +19,27 @@ public class RoomManager : MonoBehaviourPunCallbacks
     {
         lobbyWaitPanel.SetActive(true);
         statustext.text = "Connecting to server....";
-        PhotonNetwork.AutomaticallySyncScene = true;
-        PhotonNetwork.ConnectUsingSettings(); // Connect to Photon Master server
+        if (PhotonNetwork.IsConnected)
+        {
+            PhotonNetwork.Disconnect();
+        }
+        else
+        {
+            PhotonNetwork.AutomaticallySyncScene = true;
+            PhotonNetwork.ConnectUsingSettings(); // Connect to Photon Master server
+        }
+        
     }
 
     #region Photon Callbacks
+
+    public override void OnDisconnected(DisconnectCause cause)
+    {
+        base.OnDisconnected(cause);
+
+        PhotonNetwork.AutomaticallySyncScene = true;
+        PhotonNetwork.ConnectUsingSettings(); // Connect to Photon Master server
+    }
 
     public override void OnConnectedToMaster()
     {

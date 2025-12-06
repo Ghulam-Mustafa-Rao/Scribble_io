@@ -19,7 +19,7 @@ MonoBehaviour:
     AppIdVoice: 
     AppVersion: 
     UseNameServer: 1
-    FixedRegion: 
+    FixedRegion: us
     Server: 
     Port: 0
     ProxyServer: 
@@ -28,7 +28,7 @@ MonoBehaviour:
     AuthMode: 0
     EnableLobbyStatistics: 0
     NetworkLogging: 1
-  DevRegion: uae
+  DevRegion: asia
   PunLogging: 0
   EnableSupportLogger: 0
   RunInBackground: 1
@@ -40,10 +40,18 @@ MonoBehaviour:
   - Fire
   - RespawnSpaceship
   - RPC_AddPoint
-  - RPC_CreateLine
+  - RPC_ClearRT
+  - RPC_DrawLine
+  - RPC_EndGame
+  - RPC_EndTurn
   - RPC_GameStarted
+  - RPC_RegisterPrefab
   - RPC_SendChatMessage
   - RPC_SetCurrentTurn
+  - RPC_SetWord
+  - RPC_ShowMiniWinner
+  - RPC_SpawnDrawPrefab
+  - RPC_StartLine
   DisableAutoOpenWizard: 1
-  ShowSettings: 0
+  ShowSettings: 1
   DevRegionSetOnce: 1
