@@ -5,6 +5,7 @@ using System.Collections.Generic;
 
 public class DrawingTurnManager : MonoBehaviourPunCallbacks
 {
+    public bool gameStarted;
     public int currentPlayerIndex = 0;
 
     [SerializeField] WordManager wordManager;
@@ -14,8 +15,15 @@ public class DrawingTurnManager : MonoBehaviourPunCallbacks
     public Player drawer;
     public Player guesser;
 
-    public bool gameStarted;
+    
+    [Header("Game Settings")]
+    public int totalRounds = 3;
+    public int currentRound = 1;
+    public float turnDuration = 60f;
+    public float timer;
+    public bool isTurnActive = false;
 
+    public string currentWord;
     // Dictionary to store spawned draw prefabs per player
     public Dictionary<int, DrawOnTextureOnline> playerDrawers = new Dictionary<int, DrawOnTextureOnline>();
     void Start()
@@ -26,9 +34,27 @@ public class DrawingTurnManager : MonoBehaviourPunCallbacks
             SpawnDrawPrefab(PhotonNetwork.LocalPlayer.ActorNumber);
         }
     }
-    // -------------------------------
-    // Player joins: MasterClient spawns prefab for everyone
-    // -------------------------------
+
+    void Update()
+    {
+        if (isTurnActive)
+        {
+            timer -= Time.deltaTime;
+            gameUIManager.timerText.text = $"Time: {Mathf.CeilToInt(timer)}";
+            if (PhotonNetwork.IsMasterClient && timer <= 0)
+            {
+                photonView.RPC(nameof(RPC_EndTurn), null, false);
+                isTurnActive = false;
+            }
+        }
+    }
+
+
+    public void EndTurn(Player winner, bool timedOut)
+    {
+        photonView.RPC(nameof(RPC_EndTurn), RpcTarget.All, winner, timedOut);
+    }
+
     public override void OnPlayerEnteredRoom(Player newPlayer)
     {
         if (PhotonNetwork.IsMasterClient)
@@ -69,10 +95,6 @@ public class DrawingTurnManager : MonoBehaviourPunCallbacks
     }
 
 
-    // -------------------------------
-    // Spawn draw prefab (MasterClient only)
-    // -------------------------------
-
     [PunRPC]
     void RPC_SpawnDrawPrefab(int actorNumber)
     {
@@ -97,9 +119,6 @@ public class DrawingTurnManager : MonoBehaviourPunCallbacks
         drawerComp.canDraw = false;
     }
 
-    // -------------------------------
-    // RPC: register prefab locally on all clients
-    // -------------------------------
     [PunRPC]
     void RPC_RegisterPrefab()
     {
@@ -110,9 +129,7 @@ public class DrawingTurnManager : MonoBehaviourPunCallbacks
         }
     }
 
-    // -------------------------------
-    // Start first turn
-    // -------------------------------
+   
     public void AssignRoles()
     {
         Player[] players = PhotonNetwork.PlayerList;
@@ -120,9 +137,6 @@ public class DrawingTurnManager : MonoBehaviourPunCallbacks
         BroadcastTurn();
     }
 
-    // -------------------------------
-    // Broadcast turn to all clients
-    // -------------------------------
     void BroadcastTurn()
     {
         gameStarted = true;
@@ -133,9 +147,7 @@ public class DrawingTurnManager : MonoBehaviourPunCallbacks
         photonView.RPC(nameof(RPC_SetCurrentTurn), RpcTarget.All, actorNumber);
     }
 
-    // -------------------------------
-    // RPC: Set current turn for everyone
-    // -------------------------------
+  
     [PunRPC]
     void RPC_SetCurrentTurn(int actorNumber)
     {
@@ -176,12 +188,75 @@ public class DrawingTurnManager : MonoBehaviourPunCallbacks
         gameUIManager.SetWord(word);
     }
 
-    // -------------------------------
-    // Move to next turn
-    // -------------------------------
     public void EndTurn()
     {
         currentPlayerIndex = (currentPlayerIndex + 1) % PhotonNetwork.PlayerList.Length;
         BroadcastTurn();
+    }
+    [PunRPC]
+    public void RPC_EndTurn(Player winner, bool timedOut)
+    {
+        isTurnActive = false;
+
+        // Disable drawing
+        foreach (var kvp in playerDrawers)
+            kvp.Value.canDraw = false;
+
+        // Determine winner
+        Player actualWinner;
+
+        if (winner != null)
+        {
+            actualWinner = winner;
+        }
+        else
+        {
+            actualWinner = drawer;
+        }
+
+        // Update drawer score if someone guessed correctly
+        if (!gameUIManager.playerScores.ContainsKey(actualWinner.ActorNumber))
+            gameUIManager.playerScores[actualWinner.ActorNumber] = 0;
+
+        if (actualWinner != null)
+            gameUIManager.playerScores[actualWinner.ActorNumber] += 1;
+
+        // Show mini panel
+        string miniText = timedOut ? $"Time Over! Drawer: {drawer.NickName}"
+                                   : $"{actualWinner.NickName} won this turn!";
+        gameUIManager.ShowMiniWinner(miniText, actualWinner.ActorNumber);
+        
+
+        Invoke(nameof(NextTurn), 1f);
+    }
+    void NextTurn()
+    {
+        if (PhotonNetwork.IsMasterClient)
+        {
+            if (currentRound >= totalRounds)
+            {
+                // Game over
+                int maxScore = -1;
+                Player finalWinner = null;
+                foreach (var p in PhotonNetwork.PlayerList)
+                {
+                    int score = gameUIManager.playerScores.ContainsKey(p.ActorNumber) ? gameUIManager.playerScores[p.ActorNumber] : 0;
+                    if (score > maxScore)
+                    {
+                        maxScore = score;
+                        finalWinner = p;
+                    }
+                }
+
+                string winnerName = finalWinner != null ? finalWinner.NickName : "No Winner";
+                gameUIManager.EndGame(winnerName, finalWinner != null ? finalWinner.ActorNumber : -1);
+                
+            }
+            else
+            {
+                currentRound++;
+                EndTurn(); // Next drawer
+            }
+        }
     }
 }

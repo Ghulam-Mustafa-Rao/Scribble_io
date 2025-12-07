@@ -255,7 +255,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fa9f7cbffc1b80346a7145cc1222e129, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  loginScreen: {fileID: 0}
+  loginScreen: {fileID: 726626577}
 --- !u!4 &82798566
 Transform:
   m_ObjectHideFlags: 0

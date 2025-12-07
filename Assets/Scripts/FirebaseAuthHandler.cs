@@ -17,10 +17,10 @@ public class FirebaseAuthHandler : MonoBehaviour
         {
             var auth = FirebaseManager.Instance.Auth;
             var result = await auth.CreateUserWithEmailAndPasswordAsync(email, password);
-          
+
             FirebaseManager.Instance.User = result.User;
-           
-            await CreateUserStats(FirebaseManager.Instance.User.UserId);
+
+            await CreateUserStats(FirebaseManager.Instance.User.UserId, email);
             if (loginScreen != null)
                 loginScreen.register_statusText.text = "Registered successfully!";
 
@@ -34,54 +34,36 @@ public class FirebaseAuthHandler : MonoBehaviour
         }
     }
 
-    async Task CreateUserStats(string uid)
+    async Task CreateUserStats(string uid, string email)
     {
-        /* var db = FirebaseManager.Instance.Firestore;
-         Debug.Log("Step 0: CreateUserStats started");
-
-         // Reference to users/{uid}/stats/main
-         DocumentReference docRef = db.Collection("users")
-                                      .Document(uid)
-                                      .Collection("stats")
-                                      .Document("main");
-
-         Debug.Log("Step 1: Document reference created");
-
-         try
-         {
-             // Use anonymous object with explicit integer value 0
-             await docRef.SetAsync(new { wins = 0 });
-             Debug.Log("Step 2: User stats created successfully with wins = 0");
-         }
-         catch (System.Exception e)
-         {
-             Debug.LogError("Failed to create user stats: " + e);
-         }*/
-
         var db = FirebaseManager.Instance.Firestore;
-        Debug.Log("Step 0: CreateUserStats started");
 
         // Reference to users/{uid} document
         DocumentReference docRef = db.Collection("users").Document(uid);
-        Debug.Log("Step 1: Document reference created");
-
+        
         try
         {
             // Store stats as a map inside the user document
             var data = new Dictionary<string, object>
             {
-                { "stats", new Dictionary<string, object> { { "wins", 0 } } }
+                { "stats", new Dictionary<string, object> 
+                    {
+                        { "wins", 0 }
+                    }
+                },
+
+                { "email", email }
             };
 
             await docRef.SetAsync(data, SetOptions.MergeAll); // merge to preserve other fields
-            Debug.Log("Step 2: User stats created successfully with wins = 0");
+           
         }
         catch (System.Exception e)
         {
             Debug.LogError("Failed to create user stats: " + e);
         }
     }
-   
+
     // ------------------------ LOGIN ------------------------
     public async void LoginUser(string email, string password)
     {
@@ -103,7 +85,7 @@ public class FirebaseAuthHandler : MonoBehaviour
                 loginScreen.login_statusText.text = "Login success!";
                 loginScreen.register_statusText.text = "Login success!";
             }
-        
+
             UnityEngine.SceneManagement.SceneManager.LoadScene("LobbyScene");
         }
         catch (Firebase.FirebaseException e)
@@ -140,7 +122,6 @@ public class FirebaseAuthHandler : MonoBehaviour
                 }
             }
 
-            Debug.LogError(message);
             loginScreen.login_statusText.text = message;
             loginScreen.register_statusText.text = message;
         }

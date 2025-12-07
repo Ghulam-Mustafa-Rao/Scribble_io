@@ -38,17 +38,12 @@ public class GameUIManager : MonoBehaviourPunCallbacks
     public TMP_Text winnerText;
     public GameObject goBackToLobbyButton;
 
-    [Header("Timer Settings")]
-    public float turnDuration = 60f;
-    private float timer;
-    private bool isTurnActive = false;
+    
 
-    private string currentWord;
+    
     public DrawingTurnManager drawingTurnManager;
     public RectTransform drawingArea;
-    [Header("Game Settings")]
-    public int totalRounds = 3;
-    private int currentRound = 1;
+    
 
     public Dictionary<int, int> playerScores = new Dictionary<int, int>(); // actorNumber -> score
 
@@ -67,19 +62,7 @@ public class GameUIManager : MonoBehaviourPunCallbacks
 
     }
 
-    void Update()
-    {
-        if (isTurnActive)
-        {
-            timer -= Time.deltaTime;
-            timerText.text = $"Time: {Mathf.CeilToInt(timer)}";
-            if (PhotonNetwork.IsMasterClient && timer <= 0)
-            {
-                photonView.RPC(nameof(RPC_EndTurn), null, false);
-                isTurnActive = false;
-            }
-        }
-    }
+   
 
     public void OnSendChat()
     {
@@ -101,7 +84,7 @@ public class GameUIManager : MonoBehaviourPunCallbacks
     public void SetRoleText(string text) => roleText.text = text;
     public void SetWord(string word)
     {
-        currentWord = word;
+        drawingTurnManager.currentWord = word;
         wordText.text = word;
     }
 
@@ -111,9 +94,9 @@ public class GameUIManager : MonoBehaviourPunCallbacks
         string guess = guessInput.text.Trim().ToLower();
         guessInput.text = "";
 
-        if (guess == currentWord.ToLower())
+        if (guess == drawingTurnManager.currentWord.ToLower())
         {
-            photonView.RPC(nameof(RPC_EndTurn),RpcTarget.All, PhotonNetwork.LocalPlayer, false);
+            drawingTurnManager.EndTurn(PhotonNetwork.LocalPlayer, false);
         }
     }
 
@@ -128,7 +111,7 @@ public class GameUIManager : MonoBehaviourPunCallbacks
     {
         lobbyPanel.SetActive(false);
         gamePanel.SetActive(true);
-        currentRound = 1;
+        drawingTurnManager.currentRound = 1;
         playerScores.Clear();
 
         if (PhotonNetwork.IsMasterClient)
@@ -139,8 +122,8 @@ public class GameUIManager : MonoBehaviourPunCallbacks
 
     public void StartTurn()
     {
-        timer = turnDuration;
-        isTurnActive = true;
+        drawingTurnManager.timer = drawingTurnManager.turnDuration;
+        drawingTurnManager.isTurnActive = true;
 
         bool isDrawer = PhotonNetwork.LocalPlayer == drawingTurnManager.drawer;
         guessInput.gameObject.SetActive(!isDrawer);
@@ -153,40 +136,9 @@ public class GameUIManager : MonoBehaviourPunCallbacks
             kvp.Value.canDraw = kvp.Key == drawingTurnManager.drawer.ActorNumber;
     }
 
-    [PunRPC]
-    public void RPC_EndTurn(Player winner, bool timedOut)
+   public void ShowMiniWinner(string text, int winnerActor)
     {
-        isTurnActive = false;
-
-        // Disable drawing
-        foreach (var kvp in drawingTurnManager.playerDrawers)
-            kvp.Value.canDraw = false;
-
-        // Determine winner
-        Player actualWinner;
-
-        if (winner != null)
-        {
-            actualWinner = winner;
-        }
-        else
-        {
-            actualWinner = drawingTurnManager.drawer;
-        }
-
-        // Update drawer score if someone guessed correctly
-        if (!playerScores.ContainsKey(actualWinner.ActorNumber))
-            playerScores[actualWinner.ActorNumber] = 0;
-
-        if (actualWinner != null)
-            playerScores[actualWinner.ActorNumber] += 1;
-
-        // Show mini panel
-        string miniText = timedOut ? $"Time Over! Drawer: {drawingTurnManager.drawer.NickName}"
-                                   : $"{actualWinner.NickName} won this turn!";
-        photonView.RPC(nameof(RPC_ShowMiniWinner), RpcTarget.All, miniText, actualWinner.ActorNumber);
-
-        Invoke(nameof(NextTurn), 1f);
+        photonView.RPC(nameof(RPC_ShowMiniWinner), RpcTarget.All, text, winnerActor);
     }
 
     [PunRPC]
@@ -196,35 +148,9 @@ public class GameUIManager : MonoBehaviourPunCallbacks
         miniWinText.text = text;
     }
 
-    void NextTurn()
+   public void EndGame(string winnerName, int actorNumber)
     {
-
-        if (PhotonNetwork.IsMasterClient)
-        {
-            if (currentRound >= totalRounds)
-            {
-                // Game over
-                int maxScore = -1;
-                Player finalWinner = null;
-                foreach (var p in PhotonNetwork.PlayerList)
-                {
-                    int score = playerScores.ContainsKey(p.ActorNumber) ? playerScores[p.ActorNumber] : 0;
-                    if (score > maxScore)
-                    {
-                        maxScore = score;
-                        finalWinner = p;
-                    }
-                }
-
-                string winnerName = finalWinner != null ? finalWinner.NickName : "No Winner";
-                photonView.RPC(nameof(RPC_EndGame), RpcTarget.All, winnerName, finalWinner != null ? finalWinner.ActorNumber : -1);
-            }
-            else
-            {
-                currentRound++;
-                drawingTurnManager.EndTurn(); // Next drawer
-            }
-        }
+        photonView.RPC(nameof(RPC_EndGame), RpcTarget.All, winnerName, actorNumber);
     }
 
     [PunRPC]

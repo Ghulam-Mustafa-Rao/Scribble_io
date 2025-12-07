@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using Photon.Pun;
 using UnityEngine;
-public class MobileScribblePhoton : MonoBehaviourPunCallbacks
+public class DrawUsingLineRenderer_Online : MonoBehaviourPunCallbacks
 {
     [Header("Brush Settings")]
     public Color brushColor = Color.black;

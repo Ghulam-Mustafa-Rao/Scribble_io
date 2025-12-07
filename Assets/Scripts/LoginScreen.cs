@@ -65,8 +65,8 @@ public class LoginScreen : MonoBehaviour
     {
         isVisible_login = !isVisible_login;
         loginPassword.contentType = isVisible_login ?
-            TMP_InputField.ContentType.Standard :            // Show text
-            TMP_InputField.ContentType.Password;             // Hide text
+            TMP_InputField.ContentType.Standard :            
+            TMP_InputField.ContentType.Password;             
 
         loginPassword.ForceLabelUpdate();
     }
@@ -75,8 +75,8 @@ public class LoginScreen : MonoBehaviour
     {
         isVisible_reg = !isVisible_reg;
         regPassword.contentType = isVisible_reg ?
-            TMP_InputField.ContentType.Standard :            // Show text
-            TMP_InputField.ContentType.Password;             // Hide text
+            TMP_InputField.ContentType.Standard :           
+            TMP_InputField.ContentType.Password;            
 
         regPassword.ForceLabelUpdate();
     }

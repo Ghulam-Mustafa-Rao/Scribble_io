@@ -2,7 +2,6 @@ using UnityEngine;
 using Firebase;
 using Firebase.Auth;
 using Firebase.Firestore;
-using System.Threading.Tasks;
 
 public class FirebaseManager : MonoBehaviour
 {

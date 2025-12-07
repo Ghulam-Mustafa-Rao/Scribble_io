@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
 
-public class ScribbleOffline : MonoBehaviour
+public class DrawUsingLineRenderer_Offline : MonoBehaviour
 {
     [Header("Brush Settings")]
     public Color brushColor = Color.black;
