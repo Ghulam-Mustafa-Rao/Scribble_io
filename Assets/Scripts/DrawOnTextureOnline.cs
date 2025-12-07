@@ -9,7 +9,7 @@ public class DrawOnTextureOnline : MonoBehaviourPun/*, IPunObservable*/
     RectTransform rect;
     Camera canvasCam;
 
-    public bool canDraw = true;   // ADDED
+    public bool canDraw = true; 
 
     private bool drawing = false;
     private Vector2 lastUV;
@@ -33,8 +33,8 @@ public class DrawOnTextureOnline : MonoBehaviourPun/*, IPunObservable*/
 
     void Update()
     {
-        if (!canDraw) return;         // ADDED
-        if (!photonView.IsMine) return; // Only local player handles input
+        if (!canDraw) return;         
+        if (!photonView.IsMine) return;
 
         if (Input.touchCount > 0)
         {
@@ -73,7 +73,6 @@ public class DrawOnTextureOnline : MonoBehaviourPun/*, IPunObservable*/
 
         if (drawing && !ended)
         {
-            // CALL RPC so everyone draws the same line
             photonView.RPC(nameof(RPC_DrawLine), RpcTarget.AllBuffered, lastUV, uv);
             lastUV = uv;
         }
@@ -82,11 +81,6 @@ public class DrawOnTextureOnline : MonoBehaviourPun/*, IPunObservable*/
             drawing = false;
     }
 
-
-    // ============================
-    // DRAWING RPC (SYNC TO ALL)
-    // ============================
-
     [PunRPC]
     void RPC_DrawLine(Vector2 a, Vector2 b)
     {
@@ -94,9 +88,6 @@ public class DrawOnTextureOnline : MonoBehaviourPun/*, IPunObservable*/
     }
 
 
-    // ============================
-    // REAL DRAWING
-    // ============================
 
     void DrawLine(Vector2 a, Vector2 b)
     {
@@ -109,10 +100,6 @@ public class DrawOnTextureOnline : MonoBehaviourPun/*, IPunObservable*/
         RenderTexture.active = null;
     }
 
-
-    // ============================
-    // CLEAR TEXTURE (ALSO SYNCED)
-    // ============================
 
     public void ClearRT()
     {
