@@ -133,14 +133,11 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     public void QuickJoin()
     {
-        Debug.Log("Quick Join triggered...");
-
         // Try joining any available room
         foreach (var room in cachedRoomList.Values)
         {
             if (room.PlayerCount < room.MaxPlayers && room.IsOpen && room.IsVisible)
             {
-                Debug.Log("Found room. Joining: " + room.Name);
                 PhotonNetwork.JoinRoom(room.Name);
                 return;
             }
@@ -152,8 +149,8 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     public void CreateRandomRoom()
     {
-        string autoRoom = FirebaseManager.Instance.User.Email + Random.Range(1000, 9999);
-        Debug.Log("No room found. Creating new room: " + autoRoom);
+        string roomName = FirebaseManager.Instance.User.Email;
+        Debug.Log("No room found. Creating new room: " + roomName);
 
         RoomOptions options = new RoomOptions
         {
@@ -162,7 +159,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
             IsOpen = true
         };
 
-        PhotonNetwork.CreateRoom(autoRoom, options);
+        PhotonNetwork.CreateRoom(roomName, options);
     }
 
 
